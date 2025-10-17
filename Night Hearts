@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Night Hearts — Full Dynamic Demo</title>
+<style>
+  body { margin:0; padding:0; font-family:Arial,sans-serif; background:#111; display:flex; justify-content:center; align-items:center; height:100vh; }
+  #gameContainer { position:relative; width:700px; height:500px; border-radius:10px; overflow:hidden; box-shadow:0 0 20px #000; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; }
+  #background { position:absolute; top:0; left:0; width:100%; height:100%; background-size:cover; background-position:center; opacity:0; transition:opacity 0.8s ease; z-index:0; }
+  .game-box { position:relative; background:rgba(34,34,34,0.85); width:100%; padding:15px; box-sizing:border-box; z-index:2; border-top-left-radius:10px; border-top-right-radius:10px; text-align:center; }
+  #charName { font-weight:bold; color:#ff69b4; font-size:22px; margin-bottom:5px; }
+  #dialogue { min-height:80px; margin:10px 0; color:#eee; }
+  #charImage { max-width:180px; border-radius:10px; margin:10px auto; opacity:0; transition:opacity 0.5s ease; z-index:1; position:relative; }
+  .choice { background:#444; color:#fff; border:none; padding:10px 20px; margin:5px; cursor:pointer; border-radius:8px; display:block; width:90%; margin:10px auto; transition:background 0.3s ease; }
+  .choice:hover { background:#666; }
+  #nextBtn { display:inline-block; margin-top:5px; }
+  #status { margin-top:5px; font-size:14px; color:#aaa; }
+  #menu { position:absolute; width:700px; height:500px; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#222; border-radius:10px; z-index:3; }
+  #menu button { background:#ff69b4; color:#fff; border:none; padding:15px 30px; border-radius:10px; cursor:pointer; font-size:18px; margin:10px; }
+  #menu button:hover { background:#ff85c1; }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <div id="background"></div>
+
+  <!-- Start Menu -->
+  <div id="menu">
+    <h1>Night Hearts — Adults Only</h1>
+    <button onclick="startGame()">Start Demo</button>
+  </div>
+
+  <!-- Game Box -->
+  <div class="game-box" id="gameBox">
+    <img id="charImage" src="" alt="">
+    <div id="charName"></div>
+    <p id="dialogue"></p>
+    <div id="choices"></div>
+    <button class="choice" id="nextBtn" onclick="nextLine()">Next</button>
+    <div id="status"></div>
+  </div>
+</div>
+
+<!-- Audio -->
+<audio id="bgMusic" loop>
+  <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+</audio>
+<audio id="clickSound">
+  <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
+</audio>
+
+<script>
+const gameBox = document.getElementById("gameBox");
+const bgMusic = document.getElementById("bgMusic");
+const clickSound = document.getElementById("clickSound");
+const background = document.getElementById("background");
+const charImage = document.getElementById("charImage");
+
+let affection = { "Luna": 0, "Ivy": 0 };
+
+// Character expressions map
+const expressions = {
+  "Luna": { normal:"https://i.imgur.com/7k9A3qg.png", smile:"https://i.imgur.com/7k9A3qg.png", happy:"https://i.imgur.com/7k9A3qg.png", blush:"https://i.imgur.com/7k9A3qg.png" },
+  "Ivy": { normal:"https://i.imgur.com/GG4r5G6.png", smile:"https://i.imgur.com/GG4r5G6.png", blush:"https://i.imgur.com/GG4r5G6.png", angry:"https://i.imgur.com/GG4r5G6.png" }
+};
+
+// Full script with expressions & backgrounds
+const script = [
+  { char:"Luna", text:"Hey... you're finally here. I’ve been waiting for you.", expression:"normal", bg:"https://i.imgur.com/W8g0dR1.jpg" },
+  { char:"You", text:"I smile back at her nervously.", expression:"", bg:"https://i.imgur.com/W8g0dR1.jpg" },
+  { char:"Luna", text:"So, tell me... do you like confident girls, or shy ones?", expression:"smile", bg:"https://i.imgur.com/W8g0dR1.jpg",
+    choices:[
+      { text:"Confident girls are my type.", affection:{"Luna":2}, expression:"happy" },
+      { text:"Shy ones are cuter.", affection:{"Luna":1}, expression:"blush" }
+    ]
+  },
+  { char:"Ivy", text:"Oh, so you’re here too... don’t forget about me.", expression:"blush", bg:"https://i.imgur.com/Af2HCv5.jpg" },
+  { char:"Ivy", text:"Do you want to hang out after this?", expression:"smile", bg:"https://i.imgur.com/Af2HCv5.jpg",
+    choices:[
+      { text:"Of course, Ivy. I’d love to.", affection:{"Ivy":2}, expression:"happy" },
+      { text:"Sorry, I already promised Luna.", affection:{"Luna":1}, expression:"angry" }
+    ]
+  },
+  { char:"Luna", text:"Looks like we’ll be spending a lot of time together... I can’t wait.", expression:"happy", bg:"https://i.imgur.com/W8g0dR1.jpg" },
+  { char:"Ivy", text:"Don’t get too cozy with her... I’ll steal you away.", expression:"angry", bg:"https://i.imgur.com/Af2HCv5.jpg" },
+  { char:"System", text:"The night continues, and your choices have shaped who likes you more...", expression:"", bg:"" }
+];
+
+let index=-1;
+
+function startGame(){
+  document.getElementById("menu").style.display="none";
+  bgMusic.play();
+  nextLine();
+}
+
+function typeText(element,text,speed=30,callback=null){
+  element.innerText="";
+  let i=0;
+  let interval=setInterval(()=>{
+    element.innerText+=text[i];
+    i++;
+    if(i>=text.length){ clearInterval(interval); if(callback) callback(); }
+  },speed);
+}
+
+function nextLine(){
+  clickSound.play();
+  index++;
+  if(index>=script.length){ endGame(); return; }
+
+  const line = script[index];
+  document.getElementById("charName").innerText=line.char||"";
+
+  // Background fade
+  if(line.bg){
+    background.style.opacity=0;
+    background.style.backgroundImage=`url(${line.bg})`;
+    setTimeout(()=>background.style.opacity=1,50);
+  }
+
+  // Character fade with expression
+  charImage.style.opacity=0;
+  if(line.char && line.char!=="You"){
+    let expr = line.expression || "normal";
+    charImage.src = expressions[line.char][expr];
+    setTimeout(()=>charImage.style.opacity=1,50);
+  } else { charImage.src=""; }
+
+  const choiceBox=document.getElementById("choices");
+  choiceBox.innerHTML="";
+
+  if(line.choices){
+    document.getElementById("nextBtn").style.display="none";
+    typeText(document.getElementById("dialogue"),line.text);
+
+    line.choices.forEach(c=>{
+      let btn=document.createElement("button");
+      btn.innerText=c.text;
+      btn.className="choice";
+      btn.onclick=()=>{
+        clickSound.play();
+        for(let key in c.affection){ affection[key]+=c.affection[key]; }
+        if(c.expression && line.char!=="You"){ charImage.src = expressions[line.char][c.expression]; }
+        updateStatus();
+        choiceBox.innerHTML="";
+        document.getElementById("nextBtn").style.display="inline-block";
+        nextLine();
+      };
+      choiceBox.appendChild(btn);
+    });
+  } else {
+    document.getElementById("nextBtn").style.display="inline-block";
+    typeText(document.getElementById("dialogue"),line.text);
+  }
+}
+
+function updateStatus(){
+  document.getElementById("status").innerText=`Affection — Luna: ${affection["Luna"]}, Ivy: ${affection["Ivy"]}`;
+}
+
+function endGame(){
+  let winner = affection["Luna"]>affection["Ivy"]?"Luna":
+               affection["Ivy"]>affection["Luna"]?"Ivy":"both";
+  let endingText = winner==="both"? "It's a tie! Both Luna and Ivy like you equally." :
+                   `${winner} likes you the most!`;
+
+  document.getElementById("charName").innerText="System";
+  document.getElementById("dialogue").innerText=endingText;
+  charImage.style.opacity=0;
+  document.getElementById("choices").innerHTML="";
+  document.getElementById("nextBtn").style.display="none";
+}
+</script>
+
+</body>
+</html>
